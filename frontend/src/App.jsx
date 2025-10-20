@@ -5,6 +5,15 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import StudentArea from "./pages/StudentArea";
 import Navbar from './components/Navbar';
+import AdminStudents from './pages/admin/Students';
+import AdminClasses from './pages/admin/Classes';
+import AdminElections from './pages/admin/Elections';
+import AdminNominations from './pages/admin/Nominations';
+import AdminResults from './pages/admin/Results';
+import AdminProfile from './pages/admin/Profile';
+import GuestRoute from './components/GuestRoute';
+import AdminPolicy from './pages/admin/Policy';
+import AuditLogs from './pages/admin/AuditLogs';
 
 function Landing(){
   const token = localStorage.getItem('token');
@@ -46,7 +55,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
 
-      <Route path="/admin/login" element={<AdminLogin />} />
+  <Route path="/admin/login" element={<GuestRoute><AdminLogin /></GuestRoute>} />
       <Route
         path="/admin/dashboard"
         element={
@@ -55,6 +64,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/admin/students" element={<ProtectedRoute role="ADMIN"><AdminStudents/></ProtectedRoute>} />
+      <Route path="/admin/classes" element={<ProtectedRoute role="ADMIN"><AdminClasses/></ProtectedRoute>} />
+      <Route path="/admin/elections" element={<ProtectedRoute role="ADMIN"><AdminElections/></ProtectedRoute>} />
+      <Route path="/admin/nominations" element={<ProtectedRoute role="ADMIN"><AdminNominations/></ProtectedRoute>} />
+  <Route path="/admin/policy" element={<ProtectedRoute role="ADMIN"><AdminPolicy/></ProtectedRoute>} />
+    <Route path="/admin/audit" element={<ProtectedRoute role="ADMIN"><AuditLogs/></ProtectedRoute>} />
+      <Route path="/admin/results" element={<ProtectedRoute role="ADMIN"><AdminResults/></ProtectedRoute>} />
+      <Route path="/admin/profile" element={<ProtectedRoute role="ADMIN"><AdminProfile/></ProtectedRoute>} />
 
       <Route path="/student/*" element={<StudentArea />} />
 

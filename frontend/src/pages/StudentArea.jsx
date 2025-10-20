@@ -2,14 +2,18 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import StudentLogin from './student/StudentLogin';
 import StudentDashboard from './student/StudentDashboard';
-// import StudentElections from './student/StudentElections'; // Not implemented
-// import StudentNominations from './student/StudentNominations'; // Not implemented
-// import Vote from './student/Vote'; // Not implemented
 import StudentProfile from './student/StudentProfile';
 import VerifyOtp from './auth/VerifyOtp';
 import ProtectedRoute from '../components/ProtectedRoute';
+import GuestRoute from '../components/GuestRoute';
 import { useAuth } from '../context/AuthContext';
 import { useEffect } from 'react';
+import ChangePassword from './auth/ChangePassword';
+import ResetPassword from './auth/ResetPassword';
+import ElectionPage from './student/StudentElections';
+import NominationForm from './student/NominationForm';
+import VotePage from './student/Vote';
+import ResultsPage from './student/ElectionResults';
 
 export default function StudentArea(){
   const { user, logout } = useAuth();
@@ -24,13 +28,17 @@ export default function StudentArea(){
 
   return (
     <Routes>
-      <Route path="login" element={<StudentLogin/>} />
-      <Route path="verify-otp" element={<VerifyOtp/>} />
-  <Route path="dashboard" element={<ProtectedRoute role="STUDENT"><StudentDashboard/></ProtectedRoute>} />
-      {/* <Route path="elections/:id" element={<StudentElections/>} /> */}
-      {/* <Route path="elections/:id/vote" element={<Vote/>} /> */}
-      {/* <Route path="nominations" element={<StudentNominations/>} /> */}
-      {/* <Route path="profile" element={<StudentProfile/>} /> */}
+  <Route path="login" element={<GuestRoute><StudentLogin/></GuestRoute>} />
+  {/** Do NOT use GuestRoute here: after OTP verification we log the user in, and GuestRoute would redirect to dashboard before we can route to change-password */}
+  <Route path="verify-otp" element={<VerifyOtp/>} />
+      <Route path="change-password" element={<ProtectedRoute role="STUDENT"><ChangePassword/></ProtectedRoute>} />
+  <Route path="reset-password" element={<GuestRoute><ResetPassword/></GuestRoute>} />
+      <Route path="dashboard" element={<ProtectedRoute role="STUDENT"><StudentDashboard/></ProtectedRoute>} />
+      <Route path="election" element={<ProtectedRoute role="STUDENT"><ElectionPage/></ProtectedRoute>} />
+      <Route path="nomination" element={<ProtectedRoute role="STUDENT"><NominationForm/></ProtectedRoute>} />
+      <Route path="vote" element={<ProtectedRoute role="STUDENT"><VotePage/></ProtectedRoute>} />
+      <Route path="results" element={<ProtectedRoute role="STUDENT"><ResultsPage/></ProtectedRoute>} />
+      <Route path="profile" element={<ProtectedRoute role="STUDENT"><StudentProfile/></ProtectedRoute>} />
     </Routes>
   )
 }

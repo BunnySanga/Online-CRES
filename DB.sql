@@ -22,7 +22,7 @@ CREATE TABLE Student (
   last_login DATETIME,
   email VARCHAR(100),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (class_id) REFERENCES Class(class_id)
+  FOREIGN KEY (class_id) REFERENCES Class(class_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE Election (
@@ -36,8 +36,8 @@ CREATE TABLE Election (
   is_published BOOLEAN DEFAULT FALSE,
   created_by_admin_id VARCHAR(20),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (class_id) REFERENCES Class(class_id),
-  FOREIGN KEY (created_by_admin_id) REFERENCES Admin(admin_id)
+  FOREIGN KEY (class_id) REFERENCES Class(class_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (created_by_admin_id) REFERENCES Admin(admin_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE Nomination (
@@ -51,10 +51,10 @@ CREATE TABLE Nomination (
   reviewed_by_admin_id VARCHAR(20),
   reviewed_at DATETIME,
   rejection_reason TEXT,
-  FOREIGN KEY (election_id) REFERENCES Election(election_id),
-  FOREIGN KEY (student_id) REFERENCES Student(student_id),
-  FOREIGN KEY (reviewed_by_admin_id) REFERENCES Admin(admin_id),
-  UNIQUE KEY ux_nomination (election_id, student_id)
+  FOREIGN KEY (election_id) REFERENCES Election(election_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (reviewed_by_admin_id) REFERENCES Admin(admin_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE KEY ux_nomination (election_id, student_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE OTP (
@@ -65,7 +65,7 @@ CREATE TABLE OTP (
   expiry_time DATETIME NOT NULL,
   purpose ENUM('LOGIN','RESET') DEFAULT 'LOGIN',
   used BOOLEAN DEFAULT FALSE,
-  FOREIGN KEY (student_id) REFERENCES Student(student_id)
+  FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE Policy (
@@ -74,7 +74,7 @@ CREATE TABLE Policy (
   version INT DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   created_by_admin_id VARCHAR(20),
-  FOREIGN KEY (created_by_admin_id) REFERENCES Admin(admin_id)
+  FOREIGN KEY (created_by_admin_id) REFERENCES Admin(admin_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE PolicyAcceptance (
@@ -83,7 +83,7 @@ CREATE TABLE PolicyAcceptance (
   policy_id INT NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   user_role ENUM('ADMIN','STUDENT') DEFAULT 'STUDENT',
-  FOREIGN KEY (policy_id) REFERENCES Policy(policy_id)
+  FOREIGN KEY (policy_id) REFERENCES Policy(policy_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE Session (
@@ -114,8 +114,8 @@ CREATE TABLE VotingToken (
   issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   used BOOLEAN DEFAULT FALSE,
   used_at DATETIME,
-  FOREIGN KEY (student_id) REFERENCES Student(student_id),
-  FOREIGN KEY (election_id) REFERENCES Election(election_id),
+  FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (election_id) REFERENCES Election(election_id) ON DELETE CASCADE ON UPDATE CASCADE,
   INDEX ix_vt_election_used (election_id, used),
   INDEX ix_vt_token_hash (token_hash)
 );
@@ -127,8 +127,8 @@ CREATE TABLE VoterStatus (
   has_voted BOOLEAN DEFAULT FALSE,
   voted_at DATETIME,
   UNIQUE KEY ux_voter_status (student_id, election_id),
-  FOREIGN KEY (student_id) REFERENCES Student(student_id),
-  FOREIGN KEY (election_id) REFERENCES Election(election_id)
+  FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (election_id) REFERENCES Election(election_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE VoteAnonymous (
@@ -137,6 +137,6 @@ CREATE TABLE VoteAnonymous (
   ballot_id VARCHAR(64) NOT NULL,
   candidate_id VARCHAR(20) NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (election_id) REFERENCES Election(election_id),
+  FOREIGN KEY (election_id) REFERENCES Election(election_id) ON DELETE CASCADE ON UPDATE CASCADE,
   INDEX ix_vote_election (election_id)
 );

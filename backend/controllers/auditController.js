@@ -1,4 +1,3 @@
-// controllers/auditController.js
 const pool = require('../config/db');
 
 exports.listAudit = async (req, res) => {

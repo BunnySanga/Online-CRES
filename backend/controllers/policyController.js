@@ -26,7 +26,13 @@ exports.listPolicies = async (req, res) => {
 
 exports.acceptPolicy = async (req, res) => {
   try {
-    const { policy_id } = req.body;
+    let { policy_id } = req.body || {};
+    if (!policy_id) {
+      const [rows] = await pool.query('SELECT policy_id FROM Policy ORDER BY version DESC LIMIT 1');
+      if (!rows.length) return res.status(404).json({ error: 'No policy available to accept' });
+      policy_id = rows[0].policy_id;
+    }
+
     await pool.query('INSERT INTO PolicyAcceptance (user_id, policy_id, timestamp) VALUES (?, ?, NOW())', [
       req.user.id,
       policy_id

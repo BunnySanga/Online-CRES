@@ -19,7 +19,7 @@ exports.getOrCreateTokenForStudent = async (req, res) =>{
     if (!eRows.length) return res.status(404).json({ error: 'Election not found' });
     const election = eRows[0];
     const now = new Date();
-    if (now < new Date(election.voting_start) || now > new Date(election.voting_end)) {
+    if (now < new Date(election.voting_start) || now > new Date(election.voting_end) || !election.is_active) {
       return res.status(400).json({ error: 'Voting not open' });
     }
 
@@ -71,6 +71,17 @@ exports.castVote = async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+
+    // ensure latest policy accepted (if a policy exists)
+    const [pRows] = await conn.query('SELECT policy_id FROM Policy ORDER BY version DESC LIMIT 1');
+    if (pRows.length) {
+      const latestPolicyId = pRows[0].policy_id;
+      const [pa] = await conn.query('SELECT 1 FROM PolicyAcceptance WHERE user_id = ? AND policy_id = ? LIMIT 1', [userId, latestPolicyId]);
+      if (!pa.length) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'Policy must be accepted before voting' });
+      }
+    }
 
     // hash token and find token row FOR UPDATE
     const tokenHash = hashToken(token);
@@ -150,8 +161,27 @@ exports.castVote = async (req, res) => {
 exports.getResults = async (req, res) => {
   try {
     const electionId = req.params.electionId;
-    // returns aggregated vote counts
-    const [rows] = await pool.query('SELECT candidate_id, COUNT(*) AS votes FROM VoteAnonymous WHERE election_id = ? GROUP BY candidate_id ORDER BY votes DESC', [electionId]);
+
+    // Check publish status unless requester is ADMIN
+    const [eRows] = await pool.query('SELECT is_published FROM Election WHERE election_id = ?', [electionId]);
+    if (!eRows.length) return res.status(404).json({ error: 'Election not found' });
+    const published = !!eRows[0].is_published;
+
+    if (req.user?.role !== 'ADMIN' && !published) {
+      return res.status(403).json({ error: 'Results not published yet' });
+    }
+
+    // Return enriched results with candidate details
+    const [rows] = await pool.query(
+      `SELECT s.student_id AS candidate_id, s.name AS candidate_name, COALESCE(n.photo_url, NULL) AS photo_url, COUNT(*) AS votes
+       FROM VoteAnonymous v
+       JOIN Student s ON s.student_id = v.candidate_id
+       LEFT JOIN Nomination n ON n.student_id = v.candidate_id AND n.election_id = v.election_id
+       WHERE v.election_id = ?
+       GROUP BY s.student_id, s.name, n.photo_url
+       ORDER BY votes DESC`,
+      [electionId]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);

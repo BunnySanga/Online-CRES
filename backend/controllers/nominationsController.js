@@ -15,6 +15,15 @@ exports.submitNomination = async (req, res) => {
       return res.status(400).json({ error: 'Nomination window closed' });
     }
 
+    // ensure student belongs to the election's class
+    const [[s]] = await pool.query('SELECT class_id FROM Student WHERE student_id = ?', [studentId]);
+    if (!s || !s.class_id) return res.status(400).json({ error: 'Student not found or class not set' });
+    if (s.class_id !== e.class_id) return res.status(403).json({ error: 'You cannot nominate for another class election' });
+
+    // ensure only one nomination per student per election
+    const [exists] = await pool.query('SELECT 1 FROM Nomination WHERE student_id = ? AND election_id = ? LIMIT 1', [studentId, election_id]);
+    if (exists.length) return res.status(400).json({ error: 'You have already submitted a nomination for this election' });
+
     // ensure policy accepted (fetch latest policy id)
     const [policyRows] = await pool.query('SELECT * FROM Policy ORDER BY version DESC LIMIT 1');
     if (policyRows.length) {
@@ -39,6 +48,38 @@ exports.listByElection = async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// list only approved nominations for a given election (for voting UI)
+exports.listApprovedByElection = async (req, res) => {
+  const electionId = req.params.electionId;
+  try {
+    const [rows] = await pool.query(
+      `SELECT n.nomination_id, n.election_id, n.student_id, n.manifesto, n.photo_url, s.name
+       FROM Nomination n
+       JOIN Student s ON s.student_id = n.student_id
+       WHERE n.election_id = ? AND n.status = 'APPROVED'`,
+      [electionId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('listApprovedByElection error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// get current student's nomination (if any) for an election
+exports.getMyNomination = async (req, res) => {
+  try {
+    const electionId = req.params.electionId;
+    const studentId = req.user.id;
+    const [rows] = await pool.query('SELECT * FROM Nomination WHERE election_id = ? AND student_id = ? LIMIT 1', [electionId, studentId]);
+    if (!rows.length) return res.json(null);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('getMyNomination error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

@@ -52,7 +52,7 @@ export default function AdminLogin() {
         <form onSubmit={submit} className="bg-white p-8 rounded shadow w-full max-w-md">
           <h2 className="text-2xl mb-4 text-indigo-700">Administrator Sign In</h2>
           {err && <div role="alert" className="text-red-600 mb-3">{err}</div>}
-          <label className="block mb-2 text-sm font-medium">Admin ID
+          <label className="block mb-2 text-sm font-medium">Admin ID <span className="text-red-600">*</span>
             <input
               value={adminId}
               onChange={e=>setAdminId(e.target.value)}
@@ -63,7 +63,7 @@ export default function AdminLogin() {
             />
           </label>
 
-          <label className="block mb-2 text-sm font-medium">Password
+          <label className="block mb-2 text-sm font-medium">Password <span className="text-red-600">*</span>
             <input
               value={password}
               onChange={e=>setPassword(e.target.value)}
@@ -75,7 +75,7 @@ export default function AdminLogin() {
             />
           </label>
 
-          <button disabled={loading} className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-60">
+          <button disabled={loading || !adminId || !password} className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-60">
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>

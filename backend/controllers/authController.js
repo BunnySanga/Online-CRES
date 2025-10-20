@@ -1,4 +1,4 @@
-// controllers/authController.js
+
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -67,7 +67,6 @@ exports.login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const user = rows[0];
-     const hashedPassword = await bcrypt.hash(password, 10);
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       console.log(user.password_hash);
@@ -85,8 +84,8 @@ exports.login = async (req, res) => {
     await transporter.sendMail({
       from: process.env.OTP_EMAIL_FROM,
       to: user.email,
-      subject: 'Your CRES login OTP',
-      text: `Your OTP is ${otp}. It expires in 5 minutes.`
+  subject: 'Your Class Representative Election System login OTP',
+  text: `Your OTP is ${otp}. It expires in 5 minutes.`
     });
 
     await logAction(studentId, 'STUDENT', ip, 'OTP_SENT', { email: user.email });
@@ -127,8 +126,12 @@ exports.verifyOtp = async (req, res) => {
     const expiry = new Date(Date.now() + (60 * 60 * 1000));
     await pool.query('INSERT INTO Session (session_id, user_id, role, creation_time, expiry_time) VALUES (?, ?, ?, NOW(), ?)', [sessionId, studentId, 'STUDENT', expiry]);
 
-    await logAction(studentId, 'STUDENT', ip, 'LOGIN_SUCCESS', {});
-    res.json({ token, userId: studentId, role: 'STUDENT' });
+  // return must_change_password so frontend can prompt change before dashboard
+  const [sRows] = await pool.query('SELECT must_change_password FROM Student WHERE student_id = ?', [studentId]);
+  const mustChange = sRows.length ? !!sRows[0].must_change_password : false;
+
+  await logAction(studentId, 'STUDENT', ip, 'LOGIN_SUCCESS', {});
+  res.json({ token, userId: studentId, role: 'STUDENT', must_change_password: mustChange });
   } catch (err) {
     console.error('verifyOtp error', err);
     await logAction(req.body.studentId || 'UNKNOWN', 'STUDENT', req.ip, 'OTP_VERIFY_ERROR', { error: err.message }, 'FAILURE');
@@ -149,6 +152,11 @@ exports.requestPasswordReset = async (req, res) => {
     const user = studentRows[0] || adminRows[0];
     const role = studentRows.length ? 'STUDENT' : adminRows.length ? 'ADMIN' : null;
     if (!user) return res.status(404).json({ error: 'User not found' });
+    // Gmail-only support for password reset target
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(String(user.email || ''))) {
+      return res.status(400).json({ error: 'Only Gmail addresses are supported (example@gmail.com)' });
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -163,7 +171,7 @@ exports.requestPasswordReset = async (req, res) => {
     await transporter.sendMail({
       from: process.env.OTP_EMAIL_FROM,
       to: user.email,
-      subject: 'CRES Password Reset OTP',
+  subject: 'Class Representative Election System Password Reset OTP',
       text: `Your OTP to reset your password is ${otp}. It expires in 10 minutes.`
     });
 

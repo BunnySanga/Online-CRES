@@ -57,15 +57,18 @@ export default function StudentLogin() {
 
           {step === 'login' ? (
             <form onSubmit={submitLogin}>
-              <label className="block mb-2 text-sm">Student ID
+              <label className="block mb-2 text-sm">Student ID <span className="text-red-600">*</span>
                 <input value={studentId} onChange={e=>setStudentId(e.target.value)} placeholder="Student ID" aria-label="Student ID" required className="w-full border p-2 mb-3 rounded" />
               </label>
-              <label className="block mb-4 text-sm">Password
+              <label className="block mb-4 text-sm">Password <span className="text-red-600">*</span>
                 <input value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" type="password" aria-label="Password" required className="w-full border p-2 mb-3 rounded" />
               </label>
-              <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-60">
+              <button type="submit" disabled={loading || !studentId || !password} className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-60">
                 {loading ? 'Sending...' : 'Send OTP'}
               </button>
+              <div className="mt-3 text-right">
+                <a href="/student/reset-password" className="text-sm text-indigo-600">Forgot password?</a>
+              </div>
             </form>
           ) : null}
         </div>
