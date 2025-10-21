@@ -68,6 +68,18 @@ CREATE TABLE OTP (
   FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- Separate OTP table for Admin accounts (mirrors OTP but references Admin)
+CREATE TABLE IF NOT EXISTS AdminOTP (
+  otp_id INT AUTO_INCREMENT PRIMARY KEY,
+  admin_id VARCHAR(20) NOT NULL,
+  otp_code VARCHAR(10) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expiry_time DATETIME NOT NULL,
+  purpose ENUM('RESET') DEFAULT 'RESET',
+  used BOOLEAN DEFAULT FALSE,
+  FOREIGN KEY (admin_id) REFERENCES Admin(admin_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE Policy (
   policy_id INT AUTO_INCREMENT PRIMARY KEY,
   policy_text TEXT NOT NULL,

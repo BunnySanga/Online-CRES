@@ -16,3 +16,19 @@ export const resetStudentPassword = (id) => axios.post(`/admin/students/${id}/re
 // Admin profile
 export const getAdminProfile = () => axios.get('/admin/profile').then(r=>r.data);
 export const updateAdminProfile = (payload) => axios.put('/admin/profile', payload).then(r=>r.data);
+
+// request OTP for admin
+export async function requestAdminPasswordReset(adminId) {
+  const { data } = await axios.post('/auth/admin/request-reset', { admin_id: adminId });
+  return data;
+}
+
+// reset password for admin
+export async function adminResetPassword(adminId, otp, newPassword) {
+  const { data } = await axios.post('/auth/admin/reset-password', {
+    admin_id: adminId,
+    otp,
+    new_password: newPassword,
+  });
+  return data;
+}

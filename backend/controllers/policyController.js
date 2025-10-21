@@ -23,7 +23,6 @@ exports.listPolicies = async (req, res) => {
   }
 };
 
-
 exports.acceptPolicy = async (req, res) => {
   try {
     let { policy_id } = req.body || {};

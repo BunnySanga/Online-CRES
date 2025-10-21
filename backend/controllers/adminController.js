@@ -67,13 +67,55 @@ exports.createClass = async (req, res) => {
 exports.deleteClass = async (req, res) => {
   try {
     const id = req.params.id;
-    const [students] = await pool.query('SELECT COUNT(*) AS cnt FROM Student WHERE class_id = ?', [id]);
-    if (students[0].cnt > 0)
-      return res.status(400).json({ error: 'Cannot delete class with students' });
 
+    // Fetch class info and students to notify
+    const [[classRow]] = await pool.query('SELECT class_id, class_name FROM Class WHERE class_id = ?', [id]);
+    if (!classRow) return res.status(404).json({ error: 'Class not found' });
+
+    const [studentRows] = await pool.query('SELECT student_id, name, email FROM Student WHERE class_id = ?', [id]);
+    const totalStudents = studentRows.length;
+
+    // Attempt to send notification emails before deletion (best-effort)
+    let mailed = 0;
+    let mailErrors = 0;
+    try {
+      const host = process.env.SMTP_HOST;
+      const port = parseInt(process.env.SMTP_PORT || '587');
+      const user = process.env.SMTP_USER; const pass = process.env.SMTP_PASS;
+      if (host && user && pass && totalStudents > 0) {
+        const secure = String(port) === '465';
+        const transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+
+        const subject = `Class ${classRow.class_name} is being deleted`;
+        const tasks = studentRows
+          .filter(s => !!s.email)
+          .map(s => {
+            const text = [
+              `Dear ${s.name || s.student_id},`,
+              '',
+              `This is to inform you that your class "${classRow.class_name}" (ID: ${classRow.class_id}) is being deleted by the administration.`,
+              'As a result, your student record for this class will be removed from the system in accordance with our data policy.',
+              '',
+              'If you believe this is a mistake, please contact the administration immediately.',
+              '',
+              'Regards,',
+              'Election Committee'
+            ].join('\n');
+            return transporter.sendMail({ from: process.env.OTP_EMAIL_FROM || user, to: s.email, subject, text })
+              .then(() => { mailed++; })
+              .catch(() => { mailErrors++; });
+          });
+        await Promise.allSettled(tasks);
+      }
+    } catch (mailErr) {
+      // Log but do not block deletion
+      console.error('deleteClass mail notify error:', mailErr && mailErr.message ? mailErr.message : mailErr);
+    }
+
+    // Proceed to delete class (will cascade delete students due to FK)
     await pool.query('DELETE FROM Class WHERE class_id = ?', [id]);
-    await logAction(req.user.id, req.user.role, req.ip, 'CLASS_DELETED', { class_id: id });
-    res.json({ message: 'Class deleted successfully' });
+    await logAction(req.user.id, req.user.role, req.ip, 'CLASS_DELETED', { class_id: id, notified: mailed, notify_errors: mailErrors, total_students: totalStudents });
+    res.json({ message: 'Class deleted successfully', notified: mailed, notify_errors: mailErrors, total_students: totalStudents });
   } catch (err) {
     console.error('deleteClass error:', err);
     res.status(500).json({ error: 'Server error' });

@@ -1,4 +1,3 @@
-
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -55,7 +54,7 @@ exports.adminLogin = async (req, res) => {
 };
 
 // STUDENT login -> send OTP
-exports.login = async (req, res) => {
+exports.login = async (req, res)=>{
   const ip = req.ip;
   try {
     const { studentId, password } = req.body;
@@ -66,11 +65,15 @@ exports.login = async (req, res) => {
       await logAction(studentId, 'STUDENT', ip, 'LOGIN_FAILURE', { reason: 'no_user' }, 'FAILURE');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const user = rows[0];
-    const valid = await bcrypt.compare(password, user.password_hash);
+const user = rows[0];
+const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+if (!gmailRegex.test(String(user.email || ''))){
+  return res.status(400).json({ error: 'Only Gmail addresses are supported (example@gmail.com)' });
+}
+const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      console.log(user.password_hash);
-      console.log(hashedPassword);
+     console.log(user.password_hash);
+      //console.log(hashedPassword);
       await logAction(studentId, 'STUDENT', ip, 'LOGIN_FAILURE', { reason: 'invalid_password' }, 'FAILURE');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -145,14 +148,15 @@ exports.requestPasswordReset = async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'User ID required' });
 
-    // detect role
-    const [studentRows] = await pool.query('SELECT * FROM Student WHERE student_id = ?', [userId]);
-    const [adminRows] = await pool.query('SELECT * FROM Admin WHERE admin_id = ?', [userId]);
-
-    const user = studentRows[0] || adminRows[0];
-    const role = studentRows.length ? 'STUDENT' : adminRows.length ? 'ADMIN' : null;
+    // detect role and user
+    const [studentRows] = await pool.query('SELECT student_id AS id, email FROM Student WHERE student_id = ?', [userId]);
+    const [adminRows] = await pool.query('SELECT admin_id AS id, email FROM Admin WHERE admin_id = ?', [userId]);
+    const isStudent = studentRows.length > 0;
+    const isAdmin = adminRows.length > 0;
+    const user = isStudent ? studentRows[0] : isAdmin ? adminRows[0] : null;
+    const role = isStudent ? 'STUDENT' : isAdmin ? 'ADMIN' : null;
     if (!user) return res.status(404).json({ error: 'User not found' });
-    // Gmail-only support for password reset target
+
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
     if (!gmailRegex.test(String(user.email || ''))) {
       return res.status(400).json({ error: 'Only Gmail addresses are supported (example@gmail.com)' });
@@ -160,18 +164,21 @@ exports.requestPasswordReset = async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 10 * 60 * 1000);
-    await pool.query('INSERT INTO OTP (student_id, otp_code, expiry_time, purpose, used) VALUES (?, ?, ?, ?, ?)', [
-      userId,
-      otp,
-      expiry,
-      'RESET',
-      false
-    ]);
+
+    if (isStudent) {
+      await pool.query('INSERT INTO OTP (student_id, otp_code, expiry_time, purpose, used) VALUES (?, ?, ?, ?, ?)', [
+        userId, otp, expiry, 'RESET', false
+      ]);
+    } else {
+      await pool.query('INSERT INTO AdminOTP (admin_id, otp_code, expiry_time, purpose, used) VALUES (?, ?, ?, ?, ?)', [
+        userId, otp, expiry, 'RESET', false
+      ]);
+    }
 
     await transporter.sendMail({
-      from: process.env.OTP_EMAIL_FROM,
+      from: process.env.OTP_EMAIL_FROM || process.env.SMTP_USER,
       to: user.email,
-  subject: 'Class Representative Election System Password Reset OTP',
+      subject: 'Class Representative Election System Password Reset OTP',
       text: `Your OTP to reset your password is ${otp}. It expires in 10 minutes.`
     });
 
@@ -190,31 +197,44 @@ exports.resetPassword = async (req, res) => {
     const { userId, otp, newPassword } = req.body;
     if (!userId || !otp || !newPassword) return res.status(400).json({ error: 'Missing fields' });
 
-    const [rows] = await pool.query(
-      'SELECT * FROM OTP WHERE student_id = ? AND otp_code = ? AND purpose = ? AND used = FALSE ORDER BY created_at DESC LIMIT 1',
-      [userId, otp, 'RESET']
-    );
-    if (!rows.length) return res.status(400).json({ error: 'Invalid or expired OTP' });
+    // detect role
+    const [studentRows] = await pool.query('SELECT student_id FROM Student WHERE student_id = ?', [userId]);
+    const [adminRows] = await pool.query('SELECT admin_id FROM Admin WHERE admin_id = ?', [userId]);
+    const isStudent = studentRows.length > 0;
+    const isAdmin = adminRows.length > 0;
+    if (!isStudent && !isAdmin) return res.status(404).json({ error: 'User not found' });
 
-    const record = rows[0];
+    let recordRows;
+    if (isStudent) {
+      [recordRows] = await pool.query(
+        'SELECT * FROM OTP WHERE student_id = ? AND otp_code = ? AND purpose = ? AND used = FALSE ORDER BY created_at DESC LIMIT 1',
+        [userId, otp, 'RESET']
+      );
+    } else {
+      [recordRows] = await pool.query(
+        'SELECT * FROM AdminOTP WHERE admin_id = ? AND otp_code = ? AND purpose = ? AND used = FALSE ORDER BY created_at DESC LIMIT 1',
+        [userId, otp, 'RESET']
+      );
+    }
+
+    if (!recordRows.length) return res.status(400).json({ error: 'Invalid or expired OTP' });
+    const record = recordRows[0];
     if (new Date(record.expiry_time) < new Date()) {
-      await pool.query('UPDATE OTP SET used = TRUE WHERE otp_id = ?', [record.otp_id]);
+      if (isStudent) await pool.query('UPDATE OTP SET used = TRUE WHERE otp_id = ?', [record.otp_id]);
+      else await pool.query('UPDATE AdminOTP SET used = TRUE WHERE otp_id = ?', [record.otp_id]);
       return res.status(400).json({ error: 'OTP expired' });
     }
 
-    const [studentRows] = await pool.query('SELECT * FROM Student WHERE student_id = ?', [userId]);
-    const [adminRows] = await pool.query('SELECT * FROM Admin WHERE admin_id = ?', [userId]);
-    const table = studentRows.length ? 'Student' : adminRows.length ? 'Admin' : null;
-    const idField = studentRows.length ? 'student_id' : adminRows.length ? 'admin_id' : null;
-    const role = studentRows.length ? 'STUDENT' : 'ADMIN';
-
-    if (!table) return res.status(404).json({ error: 'User not found' });
-
     const newHash = await bcrypt.hash(newPassword, 10);
-    await pool.query(`UPDATE ${table} SET password_hash = ? WHERE ${idField} = ?`, [newHash, userId]);
-    await pool.query('UPDATE OTP SET used = TRUE WHERE otp_id = ?', [record.otp_id]);
+    if (isStudent) {
+      await pool.query('UPDATE Student SET password_hash = ? WHERE student_id = ?', [newHash, userId]);
+      await pool.query('UPDATE OTP SET used = TRUE WHERE otp_id = ?', [record.otp_id]);
+    } else {
+      await pool.query('UPDATE Admin SET password_hash = ? WHERE admin_id = ?', [newHash, userId]);
+      await pool.query('UPDATE AdminOTP SET used = TRUE WHERE otp_id = ?', [record.otp_id]);
+    }
 
-    await logAction(userId, role, ip, 'PASSWORD_RESET_SUCCESS', {});
+    await logAction(userId, isStudent ? 'STUDENT' : 'ADMIN', ip, 'PASSWORD_RESET_SUCCESS', {});
     res.json({ message: 'Password reset successful' });
   } catch (err) {
     console.error('resetPassword error:', err);
@@ -278,6 +298,80 @@ exports.logout = async (req, res) => {
     res.json({ message: 'Logged out successfully' });
   } catch (err) {
     console.error('logout error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.adminRequestPasswordReset = async (req, res) => {
+  const ip = req.ip;
+  try {
+    const { admin_id } = req.body;
+    if (!admin_id) return res.status(400).json({ error: 'admin_id required' });
+
+    // lookup admin in Admin table
+    const [rows] = await pool.query('SELECT admin_id, email FROM Admin WHERE admin_id = ?', [admin_id]);
+    if (!rows.length) return res.status(404).json({ error: 'Admin not found' });
+
+    // Gmail-only support (to mirror student flow constraints)
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(String(rows[0].email || ''))) {
+      return res.status(400).json({ error: 'Only Gmail addresses are supported (example@gmail.com)' });
+    }
+
+    // generate OTP and store its hash in Session table as a short-lived reset token
+    // This avoids schema changes and the Student FK on OTP table
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = hashToken(otp); // 64-hex chars
+    // Remove any existing active reset tokens for this admin stored in Session
+    await pool.query(
+      "DELETE FROM Session WHERE user_id = ? AND role = 'ADMIN' AND LENGTH(session_id) = 64 AND expiry_time > NOW()",
+      [admin_id]
+    );
+    // Create a new short-lived session row to hold the reset OTP hash
+    await pool.query(
+      'INSERT INTO Session (session_id, user_id, role, creation_time, expiry_time) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+      [otpHash, admin_id, 'ADMIN']
+    );
+
+    // send email
+    await transporter.sendMail({
+      from: process.env.OTP_EMAIL_FROM || process.env.SMTP_USER,
+      to: rows[0].email,
+      subject: 'Admin Password Reset OTP',
+      text: `Your OTP is ${otp}. It expires in 10 minutes.`
+    });
+
+    await logAction(admin_id, 'ADMIN', ip, 'PASSWORD_RESET_OTP_SENT', {});
+    res.json({ message: 'Reset OTP sent to registered email' });
+  } catch (err) {
+    console.error('adminRequestPasswordReset error', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.adminResetPassword = async (req, res) => {
+  const ip = req.ip;
+  try {
+    const { admin_id, otp, new_password } = req.body;
+    if (!admin_id || !otp || !new_password) return res.status(400).json({ error: 'admin_id, otp and new_password required' });
+
+    // verify OTP using Session table hashed token (no schema change required)
+    const otpHash = hashToken(otp);
+    const [rows] = await pool.query(
+      "SELECT * FROM Session WHERE user_id = ? AND role = 'ADMIN' AND session_id = ? AND expiry_time > NOW() LIMIT 1",
+      [admin_id, otpHash]
+    );
+    if (!rows.length) return res.status(400).json({ error: 'Invalid or expired OTP' });
+
+    const hash = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE Admin SET password_hash = ? WHERE admin_id = ?', [hash, admin_id]);
+    // Invalidate the used reset token session
+    await pool.query("DELETE FROM Session WHERE user_id = ? AND role = 'ADMIN' AND session_id = ?", [admin_id, otpHash]);
+
+    await logAction(admin_id, 'ADMIN', ip, 'PASSWORD_RESET_SUCCESS', {});
+    res.json({ message: 'Password reset successful' });
+  } catch (err) {
+    console.error('adminResetPassword error', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

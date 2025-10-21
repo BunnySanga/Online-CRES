@@ -14,6 +14,7 @@ import AdminProfile from './pages/admin/Profile';
 import GuestRoute from './components/GuestRoute';
 import AdminPolicy from './pages/admin/Policy';
 import AuditLogs from './pages/admin/AuditLogs';
+import ResetPassword from "./pages/auth/ResetPassword";
 
 function Landing(){
   const token = localStorage.getItem('token');
@@ -56,6 +57,7 @@ export default function App() {
       <Route path="/" element={<Landing />} />
 
   <Route path="/admin/login" element={<GuestRoute><AdminLogin /></GuestRoute>} />
+      <Route path="/admin/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
       <Route
         path="/admin/dashboard"
         element={
@@ -74,7 +76,6 @@ export default function App() {
       <Route path="/admin/profile" element={<ProtectedRoute role="ADMIN"><AdminProfile/></ProtectedRoute>} />
 
       <Route path="/student/*" element={<StudentArea />} />
-
       <Route path="*" element={<div className="p-6">Page Not Found</div>} />
     </Routes>
   );

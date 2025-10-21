@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { adminLogin } from '../../api/authApi';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar';
@@ -20,9 +20,8 @@ export default function AdminLogin() {
         navigate('/admin/dashboard');
         return;
       }
-      // if another role is logged in (e.g., STUDENT), clear it so admin can log in here
       if (role !== 'ADMIN') {
-        try { logout(); } catch (e) { /* ignore */ }
+        try { logout(); } catch { /* ignore */ }
       }
     }
   }, []);
@@ -33,12 +32,10 @@ export default function AdminLogin() {
     try {
       setLoading(true);
       const res = await adminLogin(adminId, password);
-      // save token via context
       login(res.token, 'ADMIN');
       navigate('/admin/dashboard');
     } catch (error) {
       console.error(error);
-      // show backend error message when credentials wrong
       setErr(error.response?.data?.error || (error.message ? error.message : 'Login failed'));
     } finally {
       setLoading(false);
@@ -52,6 +49,7 @@ export default function AdminLogin() {
         <form onSubmit={submit} className="bg-white p-8 rounded shadow w-full max-w-md">
           <h2 className="text-2xl mb-4 text-indigo-700">Administrator Sign In</h2>
           {err && <div role="alert" className="text-red-600 mb-3">{err}</div>}
+
           <label className="block mb-2 text-sm font-medium">Admin ID <span className="text-red-600">*</span>
             <input
               value={adminId}
@@ -71,9 +69,16 @@ export default function AdminLogin() {
               type="password"
               aria-label="Password"
               required
-              className="w-full border p-2 mb-5 rounded mt-1"
+              className="w-full border p-2 rounded mt-1"
             />
           </label>
+
+          {/* Forgot password link */}
+          <div className="flex justify-end mb-5">
+            <Link to="/admin/reset-password" className="text-sm text-indigo-600 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
 
           <button disabled={loading || !adminId || !password} className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-60">
             {loading ? 'Logging in...' : 'Login'}

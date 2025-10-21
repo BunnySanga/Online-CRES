@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const AuthController = require('../controllers/authController');
+const authController = require('../controllers/authController');
 const { body, validationResult } = require('express-validator');
 const { verifyToken } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
@@ -42,11 +42,15 @@ const resetValidator = [
 ];
 
 // routes
-router.post('/admin/login', AuthController.adminLogin);
-router.post('/login', loginValidator, AuthController.login);             
-router.post('/verify-otp', verifyOtpValidator, otpLimiter, AuthController.verifyOtp); 
-router.post('/change-password', verifyToken, AuthController.changePassword);
-router.post('/request-reset', AuthController.requestPasswordReset);
-router.post('/reset-password', resetValidator, otpLimiter, AuthController.resetPassword);
-router.post('/logout', verifyToken, AuthController.logout);
+router.post('/admin/login', authController.adminLogin);
+router.post('/login', loginValidator, authController.login);             
+router.post('/verify-otp', verifyOtpValidator, otpLimiter, authController.verifyOtp); 
+router.post('/change-password', verifyToken, authController.changePassword);
+router.post('/request-reset', authController.requestPasswordReset);
+router.post('/reset-password', resetValidator, otpLimiter, authController.resetPassword);
+router.post('/logout', verifyToken, authController.logout);
+// admin routes (new)
+router.post('/admin/request-reset', authController.adminRequestPasswordReset);
+router.post('/admin/reset-password', authController.adminResetPassword);
+
 module.exports = router;
