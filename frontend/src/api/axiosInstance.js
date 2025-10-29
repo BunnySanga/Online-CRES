@@ -15,12 +15,15 @@
 import axios from 'axios';
 
 /*
- * Prefer configurable API base URL for deployments.
- * - In development, when VITE_API_BASE_URL is not set, default to '/api' so Vite's dev proxy can forward
- *   to the backend automatically (no CORS, works over LAN and on mobile).
- * - In production or when front/back are on different hosts, set VITE_API_BASE_URL to the absolute backend URL.
+ * Smart API base URL configuration based on environment mode
+ * - Development: Uses '/api' with Vite proxy (localhost only)
+ * - Production: Uses direct backend URL provided via env
  */
-const API_BASE_URL = import.meta?.env?.VITE_API_BASE_URL || '/api';
+const MODE = import.meta?.env?.MODE || 'development';
+const API_BASE_URL =
+  MODE === 'development'
+    ? (import.meta?.env?.VITE_API_BASE_URL_DEV || '/api')
+    : (import.meta?.env?.VITE_API_BASE_URL_PROD || '/api');
 
 const axiosInstance = axios.create({
   /*

@@ -5,11 +5,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // listen on all addresses so LAN/mobile can access
+    host: 'localhost', // Only listen on localhost, not network interfaces
+    port: 5173,
     proxy: {
       // Forward API requests to the backend during development
       '/api': {
-        target: 'http://localhost:5500',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:5500',
         changeOrigin: true,
         secure: false,
       },

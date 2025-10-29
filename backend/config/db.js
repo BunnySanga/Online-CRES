@@ -1,6 +1,8 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
-require('dotenv').config();
+const path = require('path');
+// Always load env from backend/.env when running from repo root
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 /*
  * Database Connection Pool
@@ -18,13 +20,18 @@ require('dotenv').config();
  */
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'CollegeCRElection',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  // SSL configuration for cloud databases like Railway
+  ssl: process.env.NODE_ENV === 'production' ? {
+    rejectUnauthorized: false
+  } : false
 });
 
 async function bootstrapDefaultAdmin() {
@@ -34,7 +41,7 @@ async function bootstrapDefaultAdmin() {
       const hashedPassword = await bcrypt.hash('Admin@123', 10);
       await pool.query(
         'INSERT INTO Admin (admin_id, name, email, password_hash) VALUES (?, ?, ?, ?)',
-        ['default_admin', 'Default Admin', 'admin@example.com', hashedPassword]
+        ['admin001', 'Default Admin', 'admin@example.com', hashedPassword]
       );
       console.log('Default admin created successfully');
     }

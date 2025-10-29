@@ -4,22 +4,32 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { NODE_ENV, PORT, allowlist } = require('./config/appConfig');
+const path = require('path');
+const fs = require('fs');
+
 const app = express();
+
 function setupMiddleware(app) {
+  if (NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
   app.use(helmet());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (allowlist.has(origin)) return callback(null, true);
-        return callback(new Error(`CORS not allowed from origin: ${origin}`));
-      },
-      credentials: true,
-    })
-  );
+  if (NODE_ENV !== 'production') {
+    app.use(
+      cors({
+        origin: (origin, callback) => {
+          if (!origin) return callback(null, true);
+          if (allowlist.has(origin)) return callback(null, true);
+          return callback(new Error(`CORS not allowed from origin: ${origin}`));
+        },
+        credentials: true,
+      })
+    );
+  }
+
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: NODE_ENV === 'production' ? 200 : 10000,
@@ -55,9 +65,6 @@ function setupRoutes(app) {
   app.use('/api/admin', require('./routes/admin'));
   app.use('/api/students', require('./routes/students'));
   app.use('/api/notifications', require('./routes/notifications'));
-  app.get('/', (req, res) =>
-    res.json({ message: 'Class Representative Election System backend up' })
-  );
   app.get('/api/health', (req, res) =>
     res.json({ ok: true, now: new Date().toISOString(), env: NODE_ENV })
   );
@@ -65,12 +72,28 @@ function setupRoutes(app) {
 
 setupRoutes(app);
 
+// Serve frontend build whenever it exists (useful locally and in production)
+(() => {
+  const distPath = path.join(__dirname, '../frontend/dist');
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    // In Express 5, bare '*' is invalid. Use a regex to match all non-API GET requests.
+    app.get(/^\/(?!api).*$/, (req, res) => {
+      return res.sendFile(path.join(distPath, 'index.html'));
+    });
+    console.log(`[web] Serving frontend from: ${distPath}`);
+  } else {
+    console.warn('[web] No frontend build directory found at', distPath);
+  }
+})();
+
 /*
  * Maintenance job: runs periodically to perform background tasks (cleanup OTPs, auto-close/activate elections, etc.).
  * Note: Currently scheduled with a 1s interval for development/demo. Consider increasing interval in production (e.g., 1m).
  */
 const maintenanceJob = require('./utils/maintenanceJob');
-setInterval(maintenanceJob, 1000);
+const maintenanceIntervalMs = NODE_ENV === 'production' ? 60_000 : 1_000;
+setInterval(maintenanceJob, maintenanceIntervalMs);
 
 app.use((err, req, res, next) => {
   console.error(err);

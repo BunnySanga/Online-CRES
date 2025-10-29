@@ -1,5 +1,7 @@
 // config/appConfig.js
-require('dotenv').config();
+const path = require('path');
+// Always load env from backend/.env when running from repo root
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 /*
  * Application Configuration
@@ -17,16 +19,33 @@ require('dotenv').config();
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = process.env.PORT || 5500;
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const FRONTEND_ORIGIN =
+  process.env.FRONTEND_ORIGIN ||
+  (NODE_ENV === 'development' ? 'http://localhost:5173' : '');
 
-const defaultOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5174',
-];
-const configuredOrigin = FRONTEND_ORIGIN ? [FRONTEND_ORIGIN] : [];
-const allowlist = new Set([...configuredOrigin, ...defaultOrigins]);
+// Dynamic CORS origins - supports both local development and production
+const getOrigins = () => {
+  const origins = [];
+  
+  // Add configured frontend origin
+  if (FRONTEND_ORIGIN) {
+    origins.push(FRONTEND_ORIGIN);
+  }
+  
+  // Only add localhost origins in development
+  if (NODE_ENV === 'development') {
+    origins.push(
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5174'
+    );
+  }
+  
+  return origins;
+};
+
+const allowlist = new Set(getOrigins());
 
 module.exports = {
   NODE_ENV,
