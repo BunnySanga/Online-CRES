@@ -17,6 +17,7 @@ import React, { useEffect, useState } from 'react';
 import Navbar from '../../components/Navbar';
 import { getMyElections } from '../../api/electionApi';
 import { submitNomination, getMyNomination } from '../../api/nominationApi';
+
 import { getPolicy, acceptPolicy, getPolicyStatus } from '../../api/policyApi';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -26,7 +27,7 @@ export default function NominationForm() {
   const [allElections, setAllElections] = useState([]);
   const [myNomination, setMyNomination] = useState(null);
   const [manifesto, setManifesto] = useState('');
-  const [photoUrl, setPhotoUrl] = useState('');
+  // Removed photoUrl state
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [policy, setPolicy] = useState(null);
@@ -88,28 +89,12 @@ export default function NominationForm() {
       try {
         const mine = await getMyNomination(election.election_id);
         setMyNomination(mine);
-        if (mine && mine.manifesto) setManifesto(mine.manifesto);
-        if (mine && mine.photo_url) setPhotoUrl(mine.photo_url);
+  if (mine && mine.manifesto) setManifesto(mine.manifesto);
       } catch {}
     })();
   }, [election]);
 
-  const toDirectImageUrl = (url) => {
-    try {
-      if (!url) return url;
-      // Handle Google Drive share links
-      // Formats:
-      // - https://drive.google.com/file/d/FILE_ID/view?usp=sharing -> https://drive.google.com/uc?export=view&id=FILE_ID
-      // - https://drive.google.com/open?id=FILE_ID -> https://drive.google.com/uc?export=view&id=FILE_ID
-      let m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
-      if (m && m[1]) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-      m = url.match(/[?&]id=([^&]+)/);
-      if (m && m[1]) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-      return url;
-    } catch {
-      return url;
-    }
-  };
+  // Removed toDirectImageUrl function
 
   const handleNominateClick = async (e) => {
     // Check if student has already nominated for this election
@@ -149,11 +134,9 @@ export default function NominationForm() {
       if (myNomination)
         throw new Error('You have already submitted a nomination for this election');
       // Policy already checked when clicking "Nominate" button
-      const normalizedUrl = toDirectImageUrl(photoUrl);
       const res = await submitNomination({
         election_id: election.election_id,
         manifesto,
-        photo_url: normalizedUrl,
       });
       setMsg(res?.message || 'Nomination submitted');
       
@@ -185,8 +168,7 @@ export default function NominationForm() {
       }
       
       // Clear form fields
-      setManifesto('');
-      setPhotoUrl('');
+  setManifesto('');
     } catch (error) {
       setErr(error.response?.data?.error || error.message || 'Failed to submit');
     } finally {
@@ -233,15 +215,7 @@ export default function NominationForm() {
                       required
                     />
                   </label>
-                  <label className="block text-sm mb-2">
-                    Photo URL (optional)
-                    <input
-                      value={photoUrl}
-                      onChange={(e) => setPhotoUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="border p-2 w-full mt-1 mb-3"
-                    />
-                  </label>
+                  {/* Photo URL input removed */}
                   <Button disabled={!manifesto || isSubmitting} className="px-4">
                     {isSubmitting ? 'Submitting...' : 'Submit Nomination'}
                   </Button>
@@ -356,16 +330,7 @@ export default function NominationForm() {
                       {myNomination.manifesto}
                     </div>
                   </div>
-                  {myNomination.photo_url && (
-                    <div className="mb-2">
-                      <div className="font-semibold">Photo:</div>
-                      <img
-                        src={toDirectImageUrl(myNomination.photo_url)}
-                        alt="Nominee"
-                        className="max-w-xs rounded border"
-                      />
-                    </div>
-                  )}
+                  {/* Photo display removed */}
                 </div>
               );
             }
